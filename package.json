@@ -1,0 +1,21 @@
+{
+  "name": "ticoautos-backend",
+  "version": "1.0.0",
+  "description": "Backend de TicoAutos para ISW-711",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "keywords": [
+    "nodejs",
+    "express",
+    "mongodb",
+    "mongoose",
+    "jwt",
+    "isw-711",
+    "ticoautos"
+  ],
+  "author": "",
+  "license": "ISC"
+}
