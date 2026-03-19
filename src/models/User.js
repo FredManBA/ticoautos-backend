@@ -44,8 +44,6 @@ const userSchema = new Schema(
   }
 );
 
-userSchema.index({ email: 1 }, { unique: true });
-
 userSchema.methods.toPublicProfile = function toPublicProfile() {
   return {
     _id: this._id,
