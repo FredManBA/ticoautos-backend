@@ -267,6 +267,73 @@ const updateVehicle = async (req, res) => {
   }
 };
 
+const markVehicleAsSold = async (req, res) => {
+  const { id } = req.params;
+
+  if (isInvalidObjectId(id)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid vehicle id",
+      errors: [{ field: "id", message: "Vehicle id is invalid" }],
+    });
+  }
+
+  try {
+    const vehicle = await Vehicle.findById(id);
+
+    if (!vehicle) {
+      return res.status(404).json({
+        success: false,
+        message: "Vehicle not found",
+        errors: [{ field: "id", message: "Vehicle was not found" }],
+      });
+    }
+
+    if (!isVehicleOwner(vehicle, req.user._id)) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not allowed to modify this vehicle",
+        errors: [
+          {
+            field: "authorization",
+            message: "Only the owner can mark this vehicle as sold",
+          },
+        ],
+      });
+    }
+
+    if (vehicle.status === "sold") {
+      await vehicle.populate("owner", "_id name");
+
+      return res.status(200).json({
+        success: true,
+        message: "Vehicle is already marked as sold",
+        data: {
+          vehicle,
+        },
+      });
+    }
+
+    vehicle.status = "sold";
+    await vehicle.save();
+    await vehicle.populate("owner", "_id name");
+
+    return res.status(200).json({
+      success: true,
+      message: "Vehicle marked as sold successfully",
+      data: {
+        vehicle,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      errors: [],
+    });
+  }
+};
+
 const deleteVehicle = async (req, res) => {
   const { id } = req.params;
 
@@ -328,5 +395,6 @@ module.exports = {
   listMyVehicles,
   createVehicle,
   updateVehicle,
+  markVehicleAsSold,
   deleteVehicle,
 };

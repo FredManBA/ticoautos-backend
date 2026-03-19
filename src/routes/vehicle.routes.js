@@ -7,6 +7,7 @@ const {
   listMyVehicles,
   createVehicle,
   updateVehicle,
+  markVehicleAsSold,
   deleteVehicle,
 } = require("../controllers/vehicle.controller");
 
@@ -17,6 +18,7 @@ router.get("/", listVehicles);
 router.get("/:id", getVehicleById);
 router.post("/", authenticate, createVehicle);
 router.patch("/:id", authenticate, updateVehicle);
+router.patch("/:id/sold", authenticate, markVehicleAsSold);
 router.delete("/:id", authenticate, deleteVehicle);
 
 module.exports = router;
