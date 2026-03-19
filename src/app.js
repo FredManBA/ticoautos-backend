@@ -19,6 +19,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api/auth", require("./routes/auth.routes"));
 app.use("/api/vehicles", require("./routes/vehicle.routes"));
+app.use("/api/questions", require("./routes/question.routes"));
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({
