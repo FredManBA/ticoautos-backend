@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 
 const Vehicle = require("../models/Vehicle");
+const buildVehicleFilters = require("../utils/buildVehicleFilters");
 
 const EDITABLE_FIELDS = [
   "brand",
@@ -41,16 +42,42 @@ const isInvalidObjectId = (id) => !mongoose.isValidObjectId(id);
 const isVehicleOwner = (vehicle, userId) => vehicle.owner.equals(userId);
 
 const listVehicles = async (req, res) => {
+  const { filters, pagination, errors } = buildVehicleFilters(req.query);
+
+  if (errors.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid vehicle filters",
+      errors,
+    });
+  }
+
   try {
-    const vehicles = await Vehicle.find()
-      .populate("owner", "_id name")
-      .sort({ createdAt: -1 });
+    const [vehicles, totalItems] = await Promise.all([
+      Vehicle.find(filters)
+        .populate("owner", "_id name")
+        .sort({ createdAt: -1 })
+        .skip(pagination.skip)
+        .limit(pagination.limit),
+      Vehicle.countDocuments(filters),
+    ]);
+
+    const totalPages =
+      totalItems === 0 ? 0 : Math.ceil(totalItems / pagination.limit);
 
     return res.status(200).json({
       success: true,
       message: "Vehicles retrieved successfully",
       data: {
         items: vehicles,
+        pagination: {
+          page: pagination.page,
+          limit: pagination.limit,
+          totalItems,
+          totalPages,
+          hasNextPage: pagination.page < totalPages,
+          hasPreviousPage: pagination.page > 1 && totalPages > 0,
+        },
       },
     });
   } catch (error) {
