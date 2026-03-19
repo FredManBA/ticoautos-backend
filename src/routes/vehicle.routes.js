@@ -2,6 +2,9 @@ const express = require("express");
 
 const authenticate = require("../middlewares/auth.middleware");
 const {
+  getVehicleQuestionHistory,
+} = require("../controllers/question.controller");
+const {
   listVehicles,
   getVehicleById,
   listMyVehicles,
@@ -15,6 +18,7 @@ const router = express.Router();
 
 router.get("/mine", authenticate, listMyVehicles);
 router.get("/", listVehicles);
+router.get("/:id/questions", authenticate, getVehicleQuestionHistory);
 router.get("/:id", getVehicleById);
 router.post("/", authenticate, createVehicle);
 router.patch("/:id", authenticate, updateVehicle);
