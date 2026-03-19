@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 
 const buildVehicleFilters = require("../utils/buildVehicleFilters");
+const { createError } = require("../utils/apiResponse");
 
 const ALLOWED_BODY_FIELDS = [
   "brand",
@@ -16,13 +17,6 @@ const ALLOWED_BODY_FIELDS = [
   "images",
 ];
 
-const sendValidationError = (res, errors, message = "Validation error") =>
-  res.status(400).json({
-    success: false,
-    message,
-    errors,
-  });
-
 const isValidUrl = (value) => {
   try {
     new URL(value);
@@ -34,11 +28,11 @@ const isValidUrl = (value) => {
 
 const validateVehicleIdParam = (req, res, next) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid vehicle id",
-      errors: [{ field: "id", message: "Vehicle id is invalid" }],
-    });
+    return next(
+      createError(400, "Invalid vehicle id", [
+        { field: "id", message: "Vehicle id is invalid" },
+      ])
+    );
   }
 
   return next();
@@ -48,11 +42,7 @@ const validateVehicleListQuery = (req, res, next) => {
   const result = buildVehicleFilters(req.query);
 
   if (result.errors.length > 0) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid vehicle filters",
-      errors: result.errors,
-    });
+    return next(createError(400, "Invalid vehicle filters", result.errors));
   }
 
   req.vehicleListOptions = result;
@@ -164,7 +154,7 @@ const validateCreateVehicle = (req, res, next) => {
   const errors = validateVehiclePayload(req.body, { partial: false });
 
   if (errors.length > 0) {
-    return sendValidationError(res, errors);
+    return next(createError(400, "Validation error", errors));
   }
 
   return next();
@@ -174,7 +164,7 @@ const validateUpdateVehicle = (req, res, next) => {
   const errors = validateVehiclePayload(req.body, { partial: true });
 
   if (errors.length > 0) {
-    return sendValidationError(res, errors);
+    return next(createError(400, "Validation error", errors));
   }
 
   return next();

@@ -1,9 +1,4 @@
-const sendValidationError = (res, errors) =>
-  res.status(400).json({
-    success: false,
-    message: "Validation error",
-    errors,
-  });
+const { createError } = require("../utils/apiResponse");
 
 const validateRegister = (req, res, next) => {
   const { name, email, password, phone } = req.body;
@@ -41,7 +36,7 @@ const validateRegister = (req, res, next) => {
   }
 
   if (errors.length > 0) {
-    return sendValidationError(res, errors);
+    return next(createError(400, "Validation error", errors));
   }
 
   req.body.name = String(name).trim();
@@ -69,7 +64,7 @@ const validateLogin = (req, res, next) => {
   }
 
   if (errors.length > 0) {
-    return sendValidationError(res, errors);
+    return next(createError(400, "Validation error", errors));
   }
 
   req.body.email = String(email).trim().toLowerCase();

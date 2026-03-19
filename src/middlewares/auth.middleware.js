@@ -1,5 +1,6 @@
 const User = require("../models/User");
 const { verifyToken } = require("../utils/jwt");
+const { createError, asyncHandler } = require("../utils/apiResponse");
 
 const extractBearerToken = (authorizationHeader = "") => {
   const [scheme, token] = authorizationHeader.split(" ");
@@ -11,20 +12,16 @@ const extractBearerToken = (authorizationHeader = "") => {
   return token.trim();
 };
 
-const authenticate = async (req, res, next) => {
+const authenticate = asyncHandler(async (req, res, next) => {
   const token = extractBearerToken(req.headers.authorization);
 
   if (!token) {
-    return res.status(401).json({
-      success: false,
-      message: "Authentication required",
-      errors: [
-        {
-          field: "authorization",
-          message: "Bearer token is required",
-        },
-      ],
-    });
+    throw createError(401, "Authentication required", [
+      {
+        field: "authorization",
+        message: "Bearer token is required",
+      },
+    ]);
   }
 
   try {
@@ -32,16 +29,12 @@ const authenticate = async (req, res, next) => {
     const user = await User.findById(decodedToken.sub);
 
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-        errors: [
-          {
-            field: "authorization",
-            message: "User associated with token was not found",
-          },
-        ],
-      });
+      throw createError(401, "Authentication required", [
+        {
+          field: "authorization",
+          message: "User associated with token was not found",
+        },
+      ]);
     }
 
     req.user = user;
@@ -49,17 +42,13 @@ const authenticate = async (req, res, next) => {
 
     return next();
   } catch (error) {
-    return res.status(401).json({
-      success: false,
-      message: "Invalid or expired token",
-      errors: [
-        {
-          field: "authorization",
-          message: "Provided token is invalid or expired",
-        },
-      ],
-    });
+    throw createError(401, "Invalid or expired token", [
+      {
+        field: "authorization",
+        message: "Provided token is invalid or expired",
+      },
+    ]);
   }
-};
+});
 
 module.exports = authenticate;

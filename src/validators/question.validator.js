@@ -1,11 +1,5 @@
 const mongoose = require("mongoose");
-
-const sendValidationError = (res, errors) =>
-  res.status(400).json({
-    success: false,
-    message: "Validation error",
-    errors,
-  });
+const { createError } = require("../utils/apiResponse");
 
 const validateCreateQuestion = (req, res, next) => {
   const { vehicleId, message, askedBy, status } = req.body;
@@ -50,7 +44,7 @@ const validateCreateQuestion = (req, res, next) => {
   }
 
   if (errors.length > 0) {
-    return sendValidationError(res, errors);
+    return next(createError(400, "Validation error", errors));
   }
 
   return next();
@@ -88,7 +82,7 @@ const validateAnswerQuestion = (req, res, next) => {
   }
 
   if (errors.length > 0) {
-    return sendValidationError(res, errors);
+    return next(createError(400, "Validation error", errors));
   }
 
   return next();

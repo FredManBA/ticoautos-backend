@@ -2,6 +2,9 @@ const express = require("express");
 const cors = require("cors");
 
 const env = require("./config/env");
+const errorHandler = require("./middlewares/error.middleware");
+const notFoundHandler = require("./middlewares/notFound.middleware");
+const { sendSuccess } = require("./utils/apiResponse");
 
 const app = express();
 
@@ -22,8 +25,8 @@ app.use("/api/vehicles", require("./routes/vehicle.routes"));
 app.use("/api/questions", require("./routes/question.routes"));
 
 app.get("/api/health", (req, res) => {
-  res.status(200).json({
-    success: true,
+  return sendSuccess(res, {
+    statusCode: 200,
     message: "TicoAutos backend is running",
     data: {
       status: "ok",
@@ -31,5 +34,8 @@ app.get("/api/health", (req, res) => {
     },
   });
 });
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 module.exports = app;

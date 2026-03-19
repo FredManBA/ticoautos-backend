@@ -1,8 +1,7 @@
-const mongoose = require("mongoose");
-
 const Answer = require("../models/Answer");
 const Question = require("../models/Question");
 const Vehicle = require("../models/Vehicle");
+const { sendSuccess, createError, asyncHandler } = require("../utils/apiResponse");
 
 const QUESTION_POPULATE = [
   { path: "askedBy", select: "_id name" },
@@ -15,17 +14,6 @@ const QUESTION_POPULATE = [
     },
   },
 ];
-
-const mapValidationErrors = (error) => {
-  if (error?.name !== "ValidationError") {
-    return [];
-  }
-
-  return Object.values(error.errors).map((validationError) => ({
-    field: validationError.path,
-    message: validationError.message,
-  }));
-};
 
 const attachAnswersToQuestions = async (questions) => {
   if (questions.length === 0) {
@@ -59,402 +47,231 @@ const findQuestionsWithAnswers = async ({ filter, sort }) => {
   return attachAnswersToQuestions(questions);
 };
 
-const createQuestion = async (req, res) => {
+const createQuestion = asyncHandler(async (req, res) => {
   const { vehicleId, message } = req.body;
-  const errors = [];
 
-  if (!vehicleId || !String(vehicleId).trim()) {
-    errors.push({
-      field: "vehicleId",
-      message: "vehicleId is required",
-    });
-  } else if (!mongoose.isValidObjectId(vehicleId)) {
-    errors.push({
-      field: "vehicleId",
-      message: "vehicleId is invalid",
-    });
-  }
+  const vehicle = await Vehicle.findById(vehicleId).populate("owner", "_id name");
 
-  if (!message || !String(message).trim()) {
-    errors.push({
-      field: "message",
-      message: "Question message is required",
-    });
-  }
-
-  if (errors.length > 0) {
-    return res.status(400).json({
-      success: false,
-      message: "Validation error",
-      errors,
-    });
-  }
-
-  try {
-    const vehicle = await Vehicle.findById(vehicleId).populate("owner", "_id name");
-
-    if (!vehicle) {
-      return res.status(404).json({
-        success: false,
-        message: "Vehicle not found",
-        errors: [
-          {
-            field: "vehicleId",
-            message: "Vehicle was not found",
-          },
-        ],
-      });
-    }
-
-    if (vehicle.owner._id.equals(req.user._id)) {
-      return res.status(403).json({
-        success: false,
-        message: "You cannot ask about your own vehicle",
-        errors: [
-          {
-            field: "vehicleId",
-            message: "Own vehicles cannot receive self-questions",
-          },
-        ],
-      });
-    }
-
-    const question = await Question.create({
-      vehicle: vehicle._id,
-      askedBy: req.user._id,
-      message,
-      status: "pending",
-    });
-
-    await question.populate(QUESTION_POPULATE);
-
-    return res.status(201).json({
-      success: true,
-      message: "Question created successfully",
-      data: {
-        question,
+  if (!vehicle) {
+    throw createError(404, "Vehicle not found", [
+      {
+        field: "vehicleId",
+        message: "Vehicle was not found",
       },
-    });
-  } catch (error) {
-    const validationErrors = mapValidationErrors(error);
-
-    if (validationErrors.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation error",
-        errors: validationErrors,
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      errors: [],
-    });
+    ]);
   }
-};
 
-const listMyQuestions = async (req, res) => {
-  try {
-    const items = await findQuestionsWithAnswers({
-      filter: { askedBy: req.user._id },
-      sort: { askedAt: -1 },
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "User questions retrieved successfully",
-      data: {
-        items,
+  if (vehicle.owner._id.equals(req.user._id)) {
+    throw createError(403, "You cannot ask about your own vehicle", [
+      {
+        field: "vehicleId",
+        message: "Own vehicles cannot receive self-questions",
       },
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      errors: [],
-    });
+    ]);
   }
-};
 
-const listReceivedQuestions = async (req, res) => {
-  try {
-    const ownedVehicles = await Vehicle.find(
-      { owner: req.user._id },
-      { _id: 1 }
-    ).lean();
+  const question = await Question.create({
+    vehicle: vehicle._id,
+    askedBy: req.user._id,
+    message,
+    status: "pending",
+  });
 
-    if (ownedVehicles.length === 0) {
-      return res.status(200).json({
-        success: true,
-        message: "Received questions retrieved successfully",
-        data: {
-          items: [],
-        },
-      });
-    }
+  await question.populate(QUESTION_POPULATE);
 
-    const items = await findQuestionsWithAnswers({
-      filter: {
-        vehicle: {
-          $in: ownedVehicles.map((vehicle) => vehicle._id),
-        },
-      },
-      sort: { askedAt: -1 },
-    });
+  return sendSuccess(res, {
+    statusCode: 201,
+    message: "Question created successfully",
+    data: {
+      question,
+    },
+  });
+});
 
-    return res.status(200).json({
-      success: true,
+const listMyQuestions = asyncHandler(async (req, res) => {
+  const items = await findQuestionsWithAnswers({
+    filter: { askedBy: req.user._id },
+    sort: { askedAt: -1 },
+  });
+
+  return sendSuccess(res, {
+    statusCode: 200,
+    message: "User questions retrieved successfully",
+    data: {
+      items,
+    },
+  });
+});
+
+const listReceivedQuestions = asyncHandler(async (req, res) => {
+  const ownedVehicles = await Vehicle.find(
+    { owner: req.user._id },
+    { _id: 1 }
+  ).lean();
+
+  if (ownedVehicles.length === 0) {
+    return sendSuccess(res, {
+      statusCode: 200,
       message: "Received questions retrieved successfully",
       data: {
-        items,
+        items: [],
       },
     });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      errors: [],
-    });
-  }
-};
-
-const getVehicleQuestionHistory = async (req, res) => {
-  const { id } = req.params;
-
-  if (!id || !mongoose.isValidObjectId(id)) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid vehicle id",
-      errors: [
-        {
-          field: "id",
-          message: "Vehicle id is invalid",
-        },
-      ],
-    });
   }
 
-  try {
-    const vehicle = await Vehicle.findById(id).populate("owner", "_id name");
-
-    if (!vehicle) {
-      return res.status(404).json({
-        success: false,
-        message: "Vehicle not found",
-        errors: [
-          {
-            field: "id",
-            message: "Vehicle was not found",
-          },
-        ],
-      });
-    }
-
-    if (!vehicle.owner._id.equals(req.user._id)) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not allowed to view this vehicle history",
-        errors: [
-          {
-            field: "authorization",
-            message: "Only the vehicle owner can view this history",
-          },
-        ],
-      });
-    }
-
-    const items = await findQuestionsWithAnswers({
-      filter: { vehicle: vehicle._id },
-      sort: { askedAt: 1 },
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: "Vehicle question history retrieved successfully",
-      data: {
-        vehicle,
-        items,
+  const items = await findQuestionsWithAnswers({
+    filter: {
+      vehicle: {
+        $in: ownedVehicles.map((vehicle) => vehicle._id),
       },
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      errors: [],
-    });
-  }
-};
+    },
+    sort: { askedAt: -1 },
+  });
 
-const answerQuestion = async (req, res) => {
+  return sendSuccess(res, {
+    statusCode: 200,
+    message: "Received questions retrieved successfully",
+    data: {
+      items,
+    },
+  });
+});
+
+const getVehicleQuestionHistory = asyncHandler(async (req, res) => {
+  const vehicle = await Vehicle.findById(req.params.id).populate("owner", "_id name");
+
+  if (!vehicle) {
+    throw createError(404, "Vehicle not found", [
+      {
+        field: "id",
+        message: "Vehicle was not found",
+      },
+    ]);
+  }
+
+  if (!vehicle.owner._id.equals(req.user._id)) {
+    throw createError(403, "You are not allowed to view this vehicle history", [
+      {
+        field: "authorization",
+        message: "Only the vehicle owner can view this history",
+      },
+    ]);
+  }
+
+  const items = await findQuestionsWithAnswers({
+    filter: { vehicle: vehicle._id },
+    sort: { askedAt: 1 },
+  });
+
+  return sendSuccess(res, {
+    statusCode: 200,
+    message: "Vehicle question history retrieved successfully",
+    data: {
+      vehicle,
+      items,
+    },
+  });
+});
+
+const answerQuestion = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { message } = req.body;
-  const errors = [];
 
-  if (!id || !mongoose.isValidObjectId(id)) {
-    errors.push({
-      field: "id",
-      message: "Question id is invalid",
-    });
-  }
+  const question = await Question.findById(id).populate([
+    {
+      path: "vehicle",
+      select: "_id brand model owner status",
+      populate: {
+        path: "owner",
+        select: "_id name",
+      },
+    },
+    {
+      path: "askedBy",
+      select: "_id name",
+    },
+  ]);
 
-  if (!message || !String(message).trim()) {
-    errors.push({
-      field: "message",
-      message: "Answer message is required",
-    });
-  }
-
-  if (errors.length > 0) {
-    return res.status(400).json({
-      success: false,
-      message: "Validation error",
-      errors,
-    });
-  }
-
-  try {
-    const question = await Question.findById(id).populate([
+  if (!question) {
+    throw createError(404, "Question not found", [
       {
-        path: "vehicle",
-        select: "_id brand model owner status",
-        populate: {
-          path: "owner",
+        field: "id",
+        message: "Question was not found",
+      },
+    ]);
+  }
+
+  if (!question.vehicle) {
+    throw createError(404, "Vehicle not found", [
+      {
+        field: "question",
+        message: "Associated vehicle was not found",
+      },
+    ]);
+  }
+
+  if (!question.vehicle.owner._id.equals(req.user._id)) {
+    throw createError(403, "You are not allowed to answer this question", [
+      {
+        field: "authorization",
+        message: "Only the vehicle owner can answer this question",
+      },
+    ]);
+  }
+
+  const existingAnswer = await Answer.findOne({ question: question._id });
+
+  if (existingAnswer) {
+    throw createError(409, "Question has already been answered", [
+      {
+        field: "question",
+        message: "Only one answer is allowed per question",
+      },
+    ]);
+  }
+
+  const answer = await Answer.create({
+    question: question._id,
+    answeredBy: req.user._id,
+    message,
+  });
+
+  question.status = "answered";
+  await question.save();
+
+  await answer.populate([
+    {
+      path: "answeredBy",
+      select: "_id name",
+    },
+    {
+      path: "question",
+      select: "_id message askedAt status vehicle askedBy",
+      populate: [
+        {
+          path: "askedBy",
           select: "_id name",
         },
-      },
-      {
-        path: "askedBy",
-        select: "_id name",
-      },
-    ]);
-
-    if (!question) {
-      return res.status(404).json({
-        success: false,
-        message: "Question not found",
-        errors: [
-          {
-            field: "id",
-            message: "Question was not found",
-          },
-        ],
-      });
-    }
-
-    if (!question.vehicle) {
-      return res.status(404).json({
-        success: false,
-        message: "Vehicle not found",
-        errors: [
-          {
-            field: "question",
-            message: "Associated vehicle was not found",
-          },
-        ],
-      });
-    }
-
-    if (!question.vehicle.owner._id.equals(req.user._id)) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not allowed to answer this question",
-        errors: [
-          {
-            field: "authorization",
-            message: "Only the vehicle owner can answer this question",
-          },
-        ],
-      });
-    }
-
-    const existingAnswer = await Answer.findOne({ question: question._id });
-
-    if (existingAnswer) {
-      return res.status(409).json({
-        success: false,
-        message: "Question has already been answered",
-        errors: [
-          {
-            field: "question",
-            message: "Only one answer is allowed per question",
-          },
-        ],
-      });
-    }
-
-    const answer = await Answer.create({
-      question: question._id,
-      answeredBy: req.user._id,
-      message,
-    });
-
-    question.status = "answered";
-    await question.save();
-
-    await answer.populate([
-      {
-        path: "answeredBy",
-        select: "_id name",
-      },
-      {
-        path: "question",
-        select: "_id message askedAt status vehicle askedBy",
-        populate: [
-          {
-            path: "askedBy",
+        {
+          path: "vehicle",
+          select: "_id brand model owner",
+          populate: {
+            path: "owner",
             select: "_id name",
           },
-          {
-            path: "vehicle",
-            select: "_id brand model owner",
-            populate: {
-              path: "owner",
-              select: "_id name",
-            },
-          },
-        ],
-      },
-    ]);
+        },
+      ],
+    },
+  ]);
 
-    return res.status(201).json({
-      success: true,
-      message: "Answer created successfully",
-      data: {
-        answer,
-      },
-    });
-  } catch (error) {
-    const validationErrors = mapValidationErrors(error);
-
-    if (validationErrors.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Validation error",
-        errors: validationErrors,
-      });
-    }
-
-    if (error.code === 11000) {
-      return res.status(409).json({
-        success: false,
-        message: "Question has already been answered",
-        errors: [
-          {
-            field: "question",
-            message: "Only one answer is allowed per question",
-          },
-        ],
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      errors: [],
-    });
-  }
-};
+  return sendSuccess(res, {
+    statusCode: 201,
+    message: "Answer created successfully",
+    data: {
+      answer,
+    },
+  });
+});
 
 module.exports = {
   createQuestion,
