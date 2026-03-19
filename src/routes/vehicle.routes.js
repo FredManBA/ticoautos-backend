@@ -5,6 +5,12 @@ const {
   getVehicleQuestionHistory,
 } = require("../controllers/question.controller");
 const {
+  validateVehicleIdParam,
+  validateVehicleListQuery,
+  validateCreateVehicle,
+  validateUpdateVehicle,
+} = require("../validators/vehicle.validator");
+const {
   listVehicles,
   getVehicleById,
   listMyVehicles,
@@ -17,12 +23,12 @@ const {
 const router = express.Router();
 
 router.get("/mine", authenticate, listMyVehicles);
-router.get("/", listVehicles);
-router.get("/:id/questions", authenticate, getVehicleQuestionHistory);
-router.get("/:id", getVehicleById);
-router.post("/", authenticate, createVehicle);
-router.patch("/:id", authenticate, updateVehicle);
-router.patch("/:id/sold", authenticate, markVehicleAsSold);
-router.delete("/:id", authenticate, deleteVehicle);
+router.get("/", validateVehicleListQuery, listVehicles);
+router.get("/:id/questions", authenticate, validateVehicleIdParam, getVehicleQuestionHistory);
+router.get("/:id", validateVehicleIdParam, getVehicleById);
+router.post("/", authenticate, validateCreateVehicle, createVehicle);
+router.patch("/:id", authenticate, validateVehicleIdParam, validateUpdateVehicle, updateVehicle);
+router.patch("/:id/sold", authenticate, validateVehicleIdParam, markVehicleAsSold);
+router.delete("/:id", authenticate, validateVehicleIdParam, deleteVehicle);
 
 module.exports = router;

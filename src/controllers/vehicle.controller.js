@@ -42,7 +42,8 @@ const isInvalidObjectId = (id) => !mongoose.isValidObjectId(id);
 const isVehicleOwner = (vehicle, userId) => vehicle.owner.equals(userId);
 
 const listVehicles = async (req, res) => {
-  const { filters, pagination, errors } = buildVehicleFilters(req.query);
+  const { filters, pagination, errors } =
+    req.vehicleListOptions || buildVehicleFilters(req.query);
 
   if (errors.length > 0) {
     return res.status(400).json({
